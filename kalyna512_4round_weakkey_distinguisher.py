@@ -665,6 +665,7 @@ M3_TEMPLATE_FOR_BACKWARD_EXTENSION = [
     37, 39, 224, 43, 72, 4, 0, 0,
 ]
 
+
 M4_REQUIRED_ZERO_CONSTANTS = (
     16, 17, 18, 19, 20, 21, 24,
     25, 26, 27, 28, 32, 33, 34,
@@ -676,102 +677,157 @@ M4_ACTIVE_POSITIONS = (
 )
 
 
-def build_reference_m3() -> List[State]:
-    states: List[State] = []
-    for a in range(256):
-        s = M3_TEMPLATE_FOR_BACKWARD_EXTENSION.copy()
-        s[7] = a
-        states.append(s)
-
-    symbols, count = summarize_states(states, 512)
-    assert count == 256
-    assert symbols == expected_m3_pattern()
-    return states
+def expected_m3_pattern() -> List[str]:
+    out = ["C"] * 64
+    out[7] = "A"
+    return out
 
 
-def build_exact_m4() -> List[State]:
-    """
-    Exact M^(4)_512 obtained by one inverse round from M^(3)_512.
-    A zero reference XOR subkey is used in the inverse construction.
-    """
-    m3 = build_reference_m3()
-    m4 = [
-        inverse_round(s, ZERO512, 512)
-        for s in m3
+def expected_m4_pattern() -> List[str]:
+    rows = [
+        ("A", "C", "C", "C", "C", "C", "C", "C"),
+        ("C", "C", "C", "C", "C", "C", "C", "A"),
+        ("C", "C", "C", "C", "C", "C", "A", "C"),
+        ("C", "C", "C", "C", "C", "A", "C", "C"),
+        ("C", "C", "C", "C", "A", "C", "C", "C"),
+        ("C", "C", "C", "A", "C", "C", "C", "C"),
+        ("C", "C", "A", "C", "C", "C", "C", "C"),
+        ("C", "A", "C", "C", "C", "C", "C", "C"),
     ]
+    out = ["C"] * 64
+    for r in range(8):
+        for c in range(8):
+            out[8 * c + r] = rows[r][c]
+    return out
 
-    symbols, count = summarize_states(m4, 512)
-    assert count == 256
-    assert symbols == expected_m4_pattern()
 
-    # Check the fixed-constant conditions stated in the paper.
-    for s in m4:
+def make_reference_prewhitening_key() -> State:
+    """
+    A concrete nonzero member of the paper's 2^448 weak-key space.
+    """
+    key = deterministic_key(512, 13)
+    for p in M4_ACTIVE_POSITIONS:
+        key[p] = 0
+    return key
+
+
+KPW_REFERENCE = make_reference_prewhitening_key()
+K1_REFERENCE = deterministic_key(512, 31)
+K2_REFERENCE = deterministic_key(512, 50)
+K3_REFERENCE = deterministic_key(512, 69)
+K4_REFERENCE = deterministic_key(512, 88)
+
+
+def build_m3_template_for_paper_constraints() -> State:
+    """
+    Choose the fixed bytes of M^(3)_512 so that, after one inverse
+    round and subtraction of K_pw, the plaintext M^(4)_512 has exactly
+    the fixed zero constants stated in Section 5.2 / Appendix I.
+    """
+    template = [0] * 64
+    cols = 8
+    z_columns = [[None] * 8 for _ in range(cols)]
+
+    for p in M4_REQUIRED_ZERO_CONSTANTS:
+        row = p % 8
+        col = p // 8
+
+        desired_after_prew_byte = KPW_REFERENCE[p]
+        before_inv_s = SBOXES[row % 4][desired_after_prew_byte]
+
+        shifted_col = (col + row_shift(row, 512)) % cols
+        z_columns[shifted_col][row] = before_inv_s
+
+    for c in range(cols):
+        if any(v is not None for v in z_columns[c]):
+            z = [0 if v is None else v for v in z_columns[c]]
+            w = mix_single_column(z, MDS)  # w = M3_col xor K1_col
+            base = 8 * c
+            template[base:base + 8] = [
+                w[i] ^ K1_REFERENCE[base + i]
+                for i in range(8)
+            ]
+
+    return template
+
+
+def build_exact_m4_plaintexts() -> Tuple[List[State], List[State], List[State]]:
+    """
+    Construct the exact 2^8-text M^(4)_512 plaintext multiset satisfying
+    the paper's A/C pattern, zero constants, and weak-key conditions.
+    """
+    template = build_m3_template_for_paper_constraints()
+
+    plaintexts: List[State] = []
+    after_prew_states: List[State] = []
+    m3_states: List[State] = []
+
+    for a in range(256):
+        m3 = template.copy()
+        m3[7] = a
+
+        after_prew = inverse_round(m3, K1_REFERENCE, 512)
+        plaintext = sub64_per_column(after_prew, KPW_REFERENCE, 512)
+
+        m3_states.append(m3)
+        after_prew_states.append(after_prew)
+        plaintexts.append(plaintext)
+
+    plain_symbols, n_plain = summarize_states(plaintexts, 512)
+    prew_symbols, n_prew = summarize_states(after_prew_states, 512)
+    m3_symbols, n_m3 = summarize_states(m3_states, 512)
+
+    assert n_plain == 256
+    assert n_prew == 256
+    assert n_m3 == 256
+
+    assert plain_symbols == expected_m4_pattern()
+    assert prew_symbols == expected_m4_pattern()
+    assert m3_symbols == expected_m3_pattern()
+
+    for s in plaintexts:
         for p in M4_REQUIRED_ZERO_CONSTANTS:
             assert s[p] == 0
 
-    # Exact round-trip check.
-    for x, y in zip(m4, m3):
-        assert forward_round(x, ZERO512, 512) == y
+    for p in M4_ACTIVE_POSITIONS:
+        assert KPW_REFERENCE[p] == 0
 
-    return m4
+    for p, q, m3 in zip(plaintexts, after_prew_states, m3_states):
+        assert add64_per_column(p, KPW_REFERENCE, 512) == q
+        assert forward_round(q, K1_REFERENCE, 512) == m3
 
-
-def build_exact_m5() -> List[State]:
-    """
-    Exact M^(5)_512 obtained by one further inverse-round propagation
-    from the exact M^(4)_512 multiset.
-    """
-    m4 = build_exact_m4()
-    m5 = [
-        inverse_round(s, ZERO512, 512)
-        for s in m4
-    ]
-
-    for x, y in zip(m5, m4):
-        assert forward_round(x, ZERO512, 512) == y
-
-    return m5
+    return plaintexts, after_prew_states, m3_states
 
 
 def main() -> None:
     """
-    Section 5.2:
+    Section 5.2 / Appendix I:
     Kalyna-512 4-round weak-key integral distinguisher.
 
-    Data:
-        2^8 texts.
+    Data complexity:
+        2^8.
 
-    Paper weak-key conditions:
-        k0=k15=k22=k29=k36=k43=k50=k57=0
+    Weak-key conditions:
+        k0=k15=k22=k29=k36=k43=k50=k57=0.
 
     Weak-key space:
         2^448.
-
-    For the concrete exact reproduction below, K_pw=0 is used.
-    It is one member of the paper's weak-key space and leaves the exact
-    inverse-derived M^(4)_512 multiset unchanged through pre-whitening.
     """
     primitive_self_test()
 
-    states = build_exact_m4()
-
-    # Concrete representative member of the paper's weak-key space.
-    prewhitening_key = ZERO512.copy()
-
-    for p in M4_ACTIVE_POSITIONS:
-        assert prewhitening_key[p] == 0
+    plaintexts, _, _ = build_exact_m4_plaintexts()
 
     round_keys = [
-        deterministic_key(512, 31),
-        deterministic_key(512, 50),
-        deterministic_key(512, 69),
-        deterministic_key(512, 88),
+        K1_REFERENCE,
+        K2_REFERENCE,
+        K3_REFERENCE,
+        K4_REFERENCE,
     ]
 
     outputs, trace = stepwise_trace(
-        states,
+        plaintexts,
         round_keys,
-        prewhitening_key,
+        KPW_REFERENCE,
     )
 
     output_symbols, count = summarize_states(outputs, 512)
@@ -782,6 +838,10 @@ def main() -> None:
     print(f"Number of texts    : {count} = 2^8")
     print("Weak-key condition : k0=k15=k22=k29=k36=k43=k50=k57=0")
     print("Weak-key space     : 2^448")
+    print("Fixed plaintext constants:")
+    print("  c16=c17=c18=c19=c20=c21=c24=0")
+    print("  c25=c26=c27=c28=c32=c33=c34=0")
+    print("  c35=c40=c41=c42=c48=c49=c56=0")
     print_trace(trace)
     print()
     print(f"Balanced bytes     : {len(balanced_positions(output_symbols))}/64")
@@ -791,3 +851,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
