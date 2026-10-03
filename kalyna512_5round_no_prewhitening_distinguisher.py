@@ -645,122 +645,81 @@ def expected_m4_pattern() -> List[str]:
     return out
 
 
-# A concrete M^(3)_512 constant template.
-# Byte 7 is replaced by the active value 0..255.
-#
-# This template is chosen so that one inverse round gives the paper's
-# M^(4)_512 pattern and, in that inverse-derived plaintext structure,
-# the paper's required constants
-# c16,c17,c18,c19,c20,c21,c24,c25,c26,c27,c28,
-# c32,c33,c34,c35,c40,c41,c42,c48,c49,c56
-# are all exactly zero.
-M3_TEMPLATE_FOR_BACKWARD_EXTENSION = [
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    41, 0, 0, 0, 0, 0, 0, 0,
-    82, 44, 0, 0, 0, 0, 0, 0,
-    46, 132, 105, 0, 0, 0, 0, 0,
-    177, 250, 4, 248, 0, 0, 0, 0,
-    0, 64, 22, 54, 115, 0, 0, 0,
-    37, 39, 224, 43, 72, 4, 0, 0,
-]
 
-M4_REQUIRED_ZERO_CONSTANTS = (
-    16, 17, 18, 19, 20, 21, 24,
-    25, 26, 27, 28, 32, 33, 34,
-    35, 40, 41, 42, 48, 49, 56,
-)
-
-M4_ACTIVE_POSITIONS = (
-    0, 15, 22, 29, 36, 43, 50, 57,
-)
+K1_REFERENCE = deterministic_key(512, 31)
+K2_REFERENCE = deterministic_key(512, 50)
+K3_REFERENCE = deterministic_key(512, 69)
+K4_REFERENCE = deterministic_key(512, 88)
+K5_REFERENCE = deterministic_key(512, 107)
 
 
-def build_reference_m3() -> List[State]:
-    states: List[State] = []
-    for a in range(256):
-        s = M3_TEMPLATE_FOR_BACKWARD_EXTENSION.copy()
-        s[7] = a
-        states.append(s)
-
-    symbols, count = summarize_states(states, 512)
-    assert count == 256
-    assert symbols == expected_m3_pattern()
-    return states
-
-
-def build_exact_m4() -> List[State]:
+def build_exact_m5() -> Tuple[List[State], List[State], List[State]]:
     """
-    Exact M^(4)_512 obtained by one inverse round from M^(3)_512.
-    A zero reference XOR subkey is used in the inverse construction.
+    Section 5.3 / Appendix J.
+
+    Start from the representative M^(3)_512 multiset with byte 7 active.
+    Propagate backward twice with the same fixed round keys that are used
+    in the forward five-round experiment:
+
+        M^(4)_512 = R_{K2}^{-1}(M^(3)_512)
+        M^(5)_512 = R_{K1}^{-1}(M^(4)_512)
+
+    No pre-whitening is used.
     """
-    m3 = build_reference_m3()
-    m4 = [
-        inverse_round(s, ZERO512, 512)
-        for s in m3
+    m3_states = list(single_active_multiset(512, 7))
+
+    m4_states = [
+        inverse_round(s, K2_REFERENCE, 512)
+        for s in m3_states
     ]
 
-    symbols, count = summarize_states(m4, 512)
-    assert count == 256
-    assert symbols == expected_m4_pattern()
-
-    # Check the fixed-constant conditions stated in the paper.
-    for s in m4:
-        for p in M4_REQUIRED_ZERO_CONSTANTS:
-            assert s[p] == 0
-
-    # Exact round-trip check.
-    for x, y in zip(m4, m3):
-        assert forward_round(x, ZERO512, 512) == y
-
-    return m4
-
-
-def build_exact_m5() -> List[State]:
-    """
-    Exact M^(5)_512 obtained by one further inverse-round propagation
-    from the exact M^(4)_512 multiset.
-    """
-    m4 = build_exact_m4()
-    m5 = [
-        inverse_round(s, ZERO512, 512)
-        for s in m4
+    m5_states = [
+        inverse_round(s, K1_REFERENCE, 512)
+        for s in m4_states
     ]
 
-    for x, y in zip(m5, m4):
-        assert forward_round(x, ZERO512, 512) == y
+    m3_symbols, n3 = summarize_states(m3_states, 512)
+    m4_symbols, n4 = summarize_states(m4_states, 512)
+    m5_symbols, n5 = summarize_states(m5_states, 512)
 
-    return m5
+    assert n3 == n4 == n5 == 256
+    assert m3_symbols == expected_m3_pattern()
+    assert m4_symbols == expected_m4_pattern()
+    assert all(x == "A" for x in m5_symbols)
+
+    for x, y in zip(m5_states, m4_states):
+        assert forward_round(x, K1_REFERENCE, 512) == y
+
+    for x, y in zip(m4_states, m3_states):
+        assert forward_round(x, K2_REFERENCE, 512) == y
+
+    return m5_states, m4_states, m3_states
 
 
 def main() -> None:
     """
-    Section 5.3 / Appendix J:
     Kalyna-512 5-round integral distinguisher without pre-whitening.
 
-    Data:
-        2^8 texts.
+    Data complexity:
+        2^8.
 
     Input:
-        exact M^(5)_512 obtained by one more inverse-round propagation
-        from M^(4)_512.
+        exact M^(5)_512 obtained by two backward inverse-round
+        propagations from M^(3)_512.
 
     Pre-whitening:
         omitted.
-
-    The first newly prepended XOR subkey is fixed to the same zero
-    reference used when constructing the exact inverse-derived multiset.
     """
     primitive_self_test()
 
-    states = build_exact_m5()
+    states, _, _ = build_exact_m5()
 
     round_keys = [
-        ZERO512.copy(),
-        ZERO512.copy(),
-        deterministic_key(512, 69),
-        deterministic_key(512, 88),
-        deterministic_key(512, 107),
+        K1_REFERENCE,
+        K2_REFERENCE,
+        K3_REFERENCE,
+        K4_REFERENCE,
+        K5_REFERENCE,
     ]
 
     outputs, trace = stepwise_trace(
