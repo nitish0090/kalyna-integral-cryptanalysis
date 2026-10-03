@@ -599,7 +599,7 @@ WEAK_PREWHITENING_KEY = [
     0, 0, 0, 0,
 ]
 
-K1_REFERENCE = ZERO128.copy()
+K1_REFERENCE = deterministic_key(128, 31)
 K2_REFERENCE = deterministic_key(128, 50)
 K3_REFERENCE = deterministic_key(128, 69)
 
@@ -680,6 +680,9 @@ def build_exact_m3_for_weak_key() -> Tuple[List[State], List[State]]:
     return plaintexts, after_prew_states
 
 
+PREPENDED_ROUND_KEY = deterministic_key(128, 12)
+
+
 def build_exact_m4_no_prewhitening() -> List[State]:
     """
     Construct M^(4)_128 by one more inverse-round propagation
@@ -688,12 +691,12 @@ def build_exact_m4_no_prewhitening() -> List[State]:
     _, m3_reference = build_exact_m3_for_weak_key()
 
     m4 = [
-        inverse_round(s, ZERO128, 128)
+        inverse_round(s, PREPENDED_ROUND_KEY, 128)
         for s in m3_reference
     ]
 
     for x, y in zip(m4, m3_reference):
-        assert forward_round(x, ZERO128, 128) == y
+        assert forward_round(x, PREPENDED_ROUND_KEY, 128) == y
 
     return m4
 
@@ -780,7 +783,7 @@ def experiment() -> bool:
     input_symbols, count = summarize_states(states, 128)
 
     round_keys = [
-        ZERO128,
+        PREPENDED_ROUND_KEY,
         K1_REFERENCE,
         K2_REFERENCE,
         K3_REFERENCE,
@@ -814,3 +817,4 @@ if __name__ == "__main__":
     build_exact_m3_for_weak_key()
     build_exact_m4_no_prewhitening()
     assert experiment()
+
