@@ -599,7 +599,7 @@ WEAK_PREWHITENING_KEY = [
     0, 0, 0, 0,
 ]
 
-K1_REFERENCE = ZERO128.copy()
+K1_REFERENCE = deterministic_key(128, 31)
 K2_REFERENCE = deterministic_key(128, 50)
 K3_REFERENCE = deterministic_key(128, 69)
 
@@ -796,3 +796,4 @@ if __name__ == "__main__":
     primitive_self_test()
     build_exact_m3_for_weak_key()
     assert experiment()
+
