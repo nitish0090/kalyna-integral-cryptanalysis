@@ -1,16 +1,6 @@
-#!/usr/bin/env python3
-"""Kalyna-128: 3-round weak-key integral distinguisher.
 
-
-
-Reproducibility code accompanying:
-
-"Integral Propagation under Modulo-Addition Whitening with Application
-to Reduced-Round Kalyna"
-
-Authors: Nitish Kumar, Ranit Dutta, and Bimal Mandal
-
-No third-party Python packages are required.
+"""
+Kalyna-128: 3-round weak-key integral distinguisher.
 """
 
 from __future__ import annotations
