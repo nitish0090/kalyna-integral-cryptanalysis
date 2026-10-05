@@ -1,16 +1,7 @@
-#!/usr/bin/env python3
-"""Kalyna-128: 2-round standard integral distinguisher.
 
+"""
+Kalyna-128: 2-round standard integral distinguisher
 
-
-Reproducibility code accompanying:
-
-"Integral Propagation under Modulo-Addition Whitening with Application
-to Reduced-Round Kalyna"
-
-Authors: Nitish Kumar, Ranit Dutta, and Bimal Mandal
-
-No third-party Python packages are required.
 """
 
 from __future__ import annotations
