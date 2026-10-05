@@ -1,32 +1,48 @@
 # Integral Cryptanalysis of Reduced-Round Kalyna
 
-This repository contains the source code and experimental verification
-material accompanying the paper:
+This repository contains reproducibility code for the paper:
 
-**Integral Propagation under Modulo-Addition Whitening with Application
-to Reduced-Round Kalyna**
+**Integral Propagation under Modulo-Addition Whitening with Application to Reduced-Round Kalyna**
 
-**Authors:** Nitish Kumar, Ranit Dutta, and Bimal Mandal
+Authors: Nitish Kumar, Ranit Dutta, and Bimal Mandal.
 
-The repository contains implementations for verifying the integral
-distinguishers and key-recovery attacks presented in the paper for
-Kalyna-128, Kalyna-256, and Kalyna-512.
+The repository contains 24 Python programs:
 
-## Code
+- 9 integral-distinguisher programs
+- 9 key-recovery programs for Kalyna-b/b
+- 6 key-recovery programs for Kalyna-b/2b
 
-The repository contains two main Python programs:
+## Repository Structure
 
-- `kalyna_distinguishers.py` — verification of the integral distinguishers
-  for all Kalyna variants considered in the paper.
+### `kalyna_distinguishers/`
 
-- `kalyna_key_recovery.py` — verification of the key-recovery procedures
-  described in the paper.
+Contains the 9 distinguisher implementations for Kalyna-128,
+Kalyna-256, and Kalyna-512.
+
+### `kalyna_key_recovery_b_b/`
+
+Contains the 9 key-recovery implementations for:
+
+- Kalyna-128/128
+- Kalyna-256/256
+- Kalyna-512/512
+
+### `kalyna_key_recovery_b_2b/`
+
+Contains the 6 key-recovery implementations for:
+
+- Kalyna-128/256
+- Kalyna-256/512
 
 ## Requirements
 
 Python 3.x
 
-## Usage
+No external Python packages are required.
 
-Detailed execution instructions and expected results are provided below
-for each experiment.
+## Running the Code
+
+Each experiment can be executed directly. For example:
+
+```bash
+python kalyna_distinguishers/kalyna128_2round_distinguisher.py
