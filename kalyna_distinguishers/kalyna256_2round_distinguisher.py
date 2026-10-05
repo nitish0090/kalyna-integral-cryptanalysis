@@ -1,17 +1,6 @@
-#!/usr/bin/env python3
 """
 Kalyna-256 integral distinguisher reproducibility code.
 
-Paper:
-"Integral Propagation under Modulo-Addition Whitening with Application
-to Reduced-Round Kalyna"
-
-Authors: Nitish Kumar, Ranit Dutta, and Bimal Mandal
-
-The program prints the A/C/B/U propagation after every transformation:
-Input, Pre-whitening, and then SB, SR, MC, XOR for each round.
-
-No third-party Python packages are required.
 """
 
 from __future__ import annotations
