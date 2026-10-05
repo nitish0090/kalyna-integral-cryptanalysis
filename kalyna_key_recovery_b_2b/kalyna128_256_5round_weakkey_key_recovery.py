@@ -2,12 +2,6 @@
 """
 Kalyna-128/256 key-recovery reproducibility code.
 
-Paper:
-"Integral Propagation under Modulo-Addition Whitening with Application
-to Reduced-Round Kalyna"
-
-Authors: Nitish Kumar, Ranit Dutta, and Bimal Mandal
-
 This file implements the two-round key-recovery extensions for the
 Kalyna-b/2b family described by Algorithms 3 and 4 of the paper.
 
