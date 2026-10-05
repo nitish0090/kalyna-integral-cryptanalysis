@@ -4,8 +4,6 @@ This folder contains the reproducibility code for the integral distinguishers pr
 
 **Integral Propagation under Modulo-Addition Whitening with Application to Reduced-Round Kalyna**
 
-Authors: Nitish Kumar, Ranit Dutta, and Bimal Mandal.
-
 The code covers the three standard Kalyna block sizes: Kalyna-128, Kalyna-256, and Kalyna-512. Each script constructs the corresponding plaintext multiset, applies the reduced-round encryption, and verifies the expected integral propagation and final Balanced property.
 
 ## Files
