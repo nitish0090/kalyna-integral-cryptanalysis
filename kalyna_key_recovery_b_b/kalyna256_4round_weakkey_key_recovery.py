@@ -2,12 +2,6 @@
 """
 Kalyna-256/256 key-recovery reproducibility code.
 
-Paper:
-"Integral Propagation under Modulo-Addition Whitening with Application
-to Reduced-Round Kalyna"
-
-Authors: Nitish Kumar, Ranit Dutta, and Bimal Mandal
-
 This file implements the 64-bit-column last-round recovery used by
 Algorithms 1 and 2 of the paper for Kalyna-256/256.
 
